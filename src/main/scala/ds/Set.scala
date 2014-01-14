@@ -1,46 +1,50 @@
 package ds
 
-sealed abstract class Set[+T <% Ordered[T]] {
-  def insert[U >: T <% Ordered[U]](x: U) : Set[U]
-  def member[U >: T <% Ordered[U]](x: U) : Boolean
+sealed abstract class Set[+T : Orderable] {
+  def insert[U >: T : Orderable](x: U) : Set[U]
+  def member[U >: T : Orderable](x: U) : Boolean
 }
 
-abstract class BST[+T <% Ordered[T]] extends Set[T] {
+abstract class BST[+T : Orderable] extends Set[T] {
   def depth : Int
-  def insert[U >: T <% Ordered[U]](x: U) : BST[U]
+  def insert[U >: T : Orderable](x: U) : BST[U]
+  def toList : List[T]
 }
 
 object BST {
 
   class Leaf extends BST[Nothing] {
-    def member[U <% Ordered[U]](x: U) = false
-    def insert[U <% Ordered[U]](x: U) : BST[U] = Node(x, Leaf, Leaf)
+    def member[U : Orderable](x: U) = false
+    def insert[U : Orderable](x: U) : BST[U] = Node(x, Leaf, Leaf)
     def depth: Int = 0
+    def toList = Nil
   }
 
-  class Node[+T <% Ordered[T]](y: T, left: BST[T], right: BST[T]) extends BST[T] {        
-    def member[U >: T <% Ordered[U]](x: U) = if (x < y) left.member(x)
+  class Node[+T : Orderable](y: T, left: BST[T], right: BST[T]) extends BST[T] {
+    def member[U >: T : Orderable](x: U) = if (x < y) left.member(x)
                        else if (x > y) right.member(x)
                        else true
 
-    def insert[U >: T <% Ordered[U]](x: U) : BST[U] = if (x < y) Node(y, left.insert(x), right)
+    def insert[U >: T : Orderable](x: U) : BST[U] = if (x < y) Node(y, left.insert(x), right)
                                else if (x > y) Node(y, left, right.insert(x))
                                else this
 
     def depth : Int = 1 + Math.max(left.depth, right.depth)
+
+    def toList = (left.toList :+ y) ++ right.toList
   }
-  
+
   object Node {
-    def apply[T <% Ordered[T]](y: T, left: BST[T], right: BST[T]) = new Node(y, left, right)
+    def apply[T : Orderable](y: T, left: BST[T], right: BST[T]) = new Node(y, left, right)
   }
   val Leaf = new Leaf()
 
-  def apply[T <% Ordered[T]](xs: T*) : BST[T] = xs.foldLeft(Leaf.asInstanceOf[BST[T]])((t, x) => t.insert(x))
+  def apply[T : Orderable](xs: T*) : BST[T] = xs.foldLeft(Leaf.asInstanceOf[BST[T]])((t, x) => t.insert(x))
 }
 
 trait RBT[+T] extends BST[T] {
-  def balancedInsert[U >: T <% Ordered[U]](x: U) : RBT[U]
-  def insert[U >: T <% Ordered[U]](x: U) : RBT[U]
+  def balancedInsert[U >: T : Orderable](x: U) : RBT[U]
+  def insert[U >: T : Orderable](x: U) : RBT[U]
 }
 
 object RBT {
@@ -50,32 +54,20 @@ object RBT {
 
   case object Leaf extends BST.Leaf with RBT[Nothing] {
     val color = Black
-    override def insert[U <% Ordered[U]](x: U): RBT[U] = Node(Red, x, Leaf, Leaf)
-    def balancedInsert[U <% Ordered[U]](x: U): RBT[U] = insert(x)
+    override def insert[U : Orderable](x: U): RBT[U] = Node(Red, x, Leaf, Leaf)
+    def balancedInsert[U : Orderable](x: U): RBT[U] = insert(x)
   }
 
-  case class Node[+T <% Ordered[T]](color: Color, v: T, left: RBT[T], right: RBT[T]) extends BST.Node[T](v, left, right) with RBT[T] {
-    def balancedInsert[U >: T <% Ordered[U]](e: U): RBT[U] = {
+  case class Node[+T : Orderable](color: Color, v: T, left: RBT[T], right: RBT[T]) extends BST.Node[T](v, left, right) with RBT[T] {
+    def balancedInsert[U >: T : Orderable](e: U): RBT[U] = {
       def balance(cn: RBT[U]): RBT[U] = cn match {
-        case         Node(Black, z,
-                   Node(Red, y,
-                Node(Red, x,
-                       a,    b),   c),   d) =>
+        case Node(Black, z, Node(Red, y, Node(Red, x, a, b), c), d) =>
           Node(Red, y, Node(Black, x, a, b), Node(Black, z, c, d))
-        case Node(Black, z,
-            Node(Red, x,
-           a, Node(Red, y,
-                       b, c)),  d) =>
+        case Node(Black, z, Node(Red, x, a, Node(Red, y, b, c)), d) =>
           Node(Red, y, Node(Black, x, a, b), Node(Black, z, c, d))
-        case Node(Black, x,
-                       a,  Node(Red, y,
-                                   b, Node(Red, z,
-                                               c, d))) =>
+        case Node(Black, x, a, Node(Red, y, b, Node(Red, z, c, d))) =>
           Node(Red, y, Node(Black, x, a, b), Node(Black, z, c, d))
-        case Node(Black, x,
-                      a,  Node(Red, z,
-                         Node(Red, y,
-                                  b, c), d)) =>
+        case Node(Black, x, a, Node(Red, z, Node(Red, y, b, c), d)) =>
           Node(Red, y, Node(Black, x, a, b), Node(Black, z, c, d))
         case c => c
       }
@@ -85,11 +77,11 @@ object RBT {
       else this
     }
 
-    override def insert[U >: T <% Ordered[U]](e: U) : RBT[U] = {
+    override def insert[U >: T : Orderable](e: U) : RBT[U] = {
       val Node(_, a1,a2,a3) = balancedInsert(e)
       Node(Black, a1, a2, a3)
     }
   }
 
-  def apply[T <% Ordered[T]](xs: T*) = xs.foldLeft(Leaf.asInstanceOf[RBT[T]])((t, x) => t.insert(x))
+  def apply[T : Orderable](xs: T*) = xs.foldLeft(Leaf.asInstanceOf[RBT[T]])((t, x) => t.insert(x))
 }
