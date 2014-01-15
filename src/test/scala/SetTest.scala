@@ -21,6 +21,10 @@ class SetTest extends FunSuite with Checkers {
     check((s: BST[Int], x: Int) => s.insert(x).member(x))
   }
 
+  test("Set delete") {
+    check((s: BST[Int], x: Int) => !s.delete(x).member(x))
+  }
+
   test("Set Inorder") {
     check((s: BST[Int]) => isSorted(s.toList))
   }
