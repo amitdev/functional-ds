@@ -5,11 +5,11 @@ import scala.xml.NodeSeq
 
 object SetUtil {
 
-  case class AugmentedData[T <% Ordered[T], U](v: T, data: U) extends Ordered[AugmentedData[T, U]] {
+  case class AugmentedData[T : Orderable, U](v: T, data: U) extends Ordered[AugmentedData[T, U]] {
     def compare(that: AugmentedData[T, U]): Int = this.v.compare(that.v)
   }
 
-  def toPos[T <% Ordered[T]](node: RBT[T], d: Int = 80, start: Int = 30) : RBT[AugmentedData[T, (Int, Int)]] = {
+  def toPos[T : Orderable](node: RBT[T], d: Int = 80, start: Int = 30) : RBT[AugmentedData[T, (Int, Int)]] = {
     def calcPos(n: RBT[T], x: Int, y: Int) : (RBT[AugmentedData[T, (Int, Int)]], Int) = {
       n match {
         case Leaf => (Leaf, x)
@@ -22,7 +22,7 @@ object SetUtil {
     calcPos(node, start, start)._1
   }
 
-  def toSvg[T <% Ordered[T]](node: RBT[AugmentedData[T, (Int, Int)]]): NodeSeq = {
+  def toSvg[T : Orderable](node: RBT[AugmentedData[T, (Int, Int)]]): NodeSeq = {
     val rgb = Map[Color, String](Black -> "#000000", Red -> "#7f0000")
     def genSvg(n: RBT[AugmentedData[T, (Int, Int)]]) : NodeSeq = n match {
       case Node(c, AugmentedData(t, (x, y)), left, right) =>
