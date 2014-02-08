@@ -1,4 +1,5 @@
-import ds.{Stack, CList, Empty}
+import ds.Stack
+import ds.Stack._
 import org.junit.runner.RunWith
 import org.scalacheck.Arbitrary._
 import org.scalacheck.Gen
