@@ -1,63 +1,104 @@
 package ds
 
-import scala.collection.mutable.{ArrayBuffer, Builder}
+import scala.collection.mutable.ArrayBuffer
 import scala.collection.generic.{CanBuildFrom, OrderedTraversableFactory, GenericOrderedCompanion, GenericOrderedTraversableTemplate}
 import scala.collection._
 import scala.Iterator
 
-case class Node[A](v: A, rank: Int = 0, children: List[Node[A]] = Nil)(implicit val ord: Ordering[A]) {
-  def link(other: Node[A]) =
-    if (ord.compare(v, other.v) < 0) Node(v, rank+1, other :: children)
-    else Node(other.v, other.rank+1, this :: other.children)
+/**
+ * A class representing a Node in the Binomial queue. Not intended to be used directly.
+ * @param data The actual value stored in the Node.
+ * @param rank Rank of the node.
+ * @param children List of children.
+ * @param ord Ordering of data.
+ * @tparam A Type of data.
+ */
+private case class Node[A](data: A, rank: Int = 0, children: List[Node[A]] = Nil)
+                  (implicit val ord: Ordering[A]) extends Ordered[Node[A]] {
 
-  def toList : List[A] = v :: children.flatMap(_.toList)
+  /**
+   * Links this node with another one and appropriately rearranges things.
+   * @param other the node to link
+   * @return Node with this and other linked.
+   */
+  def link(other: Node[A]) =
+    if (ord.compare(data, other.data) < 0) Node(data, rank+1, other :: children)
+    else Node(other.data, other.rank+1, this :: other.children)
+
+  def toList : List[A] = data :: children.flatMap(_.toList)
+
+  override def compare(that: Node[A]): Int = ord.compare(data, that.data)
 }
 
-final case class PriorityQueue[T](private val nodes: List[Node[T]])(implicit val ord: Ordering[T])
-  extends Iterable[T]
-    with GenericOrderedTraversableTemplate[T, PriorityQueue]
-    with IterableLike[T, PriorityQueue[T]] {
 
-  import PriorityQueue._
+abstract class PriorityQueue[A](implicit val ord: Ordering[A])
+  extends Iterable[A]
+  with GenericOrderedTraversableTemplate[A, PriorityQueue]
+  with IterableLike[A, PriorityQueue[A]] {
 
-  def +(x: T) : PriorityQueue[T] = PriorityQueue(insertNode(Node(x), nodes))
-  def findMin: T = getMinNode.v
-
-  def deleteMin(): PriorityQueue[T] = {
-    val minNode = getMinNode
-    PriorityQueue(meldLists(nodes.filter(_ != minNode), minNode.children.reverse))
-  }
-
-  def meld(that: PriorityQueue[T]) : PriorityQueue[T] = (this, that) match {
-    case (PriorityQueue(Nil), q) => q
-    case (q, PriorityQueue(Nil)) => q
-    case (PriorityQueue(thisList), PriorityQueue(thatList)) => PriorityQueue(meldLists(thisList, thatList))
-  }
-
-  private def getMinNode : Node[T] = {
-    lazy val cmp: Ordering[Node[T]] = new Ordering[Node[T]] {
-      override def compare(x: Node[T], y: Node[T]): Int = ord.compare(x.v, y.v)
-    }
-    nodes.min(cmp)
-  }
-
-  override def isEmpty: Boolean = nodes.isEmpty
+  def +(x: A) : PriorityQueue[A]
+  def findMin: A
+  def deleteMin(): PriorityQueue[A]
+  def meld(that: PriorityQueue[A]) : PriorityQueue[A]
 
   override def orderedCompanion: GenericOrderedCompanion[PriorityQueue] = PriorityQueue
-
-  override def iterator: Iterator[T] = nodes.flatMap(_.toList).iterator
-
-  override protected[this] def newBuilder: mutable.Builder[T, PriorityQueue[T]] = PriorityQueue.newBuilder
+  override protected[this] def newBuilder: mutable.Builder[A, PriorityQueue[A]] = PriorityQueue.newBuilder
 }
 
-object PriorityQueue extends OrderedTraversableFactory[PriorityQueue] {
+/**
+ * This class implements a PriorityQueue using Binomial heaps.
+ * @param nodes The forest of Nodes
+ * @param ord Ordering of data
+ * @tparam A Type of data
+ */
+private final case class BinomialQueue[A] (private val nodes: List[Node[A]])(implicit override val ord: Ordering[A])
+  extends PriorityQueue[A] {
+
+  /**
+   * Adds a new item to the PriorityQueue.
+   * @param x Item to add
+   * @return New PriorityQueue which has this item added
+   */
+  def +(x: A) : BinomialQueue[A] = BinomialQueue(insertNode(Node(x), nodes))
+
+  /**
+   * Finds the minimum item.
+   * @return the minimum item
+   */
+  def findMin: A = nodes.min.data
+
+  /**
+   * Deletes the minimum item.
+   *
+   * @return New PriorityQueue which has the min item deleted.
+   */
+  def deleteMin(): PriorityQueue[A] = {
+    val minNode = nodes.min
+    BinomialQueue(meldLists(nodes.filter(_ != minNode), minNode.children.reverse))
+  }
+
+  /**
+   * Merges two PriorityQueue together.
+   *
+   * @param that the PriorityQueue to merge
+   * @return merged PriorityQueue
+   */
+  def meld(that: PriorityQueue[A]) : PriorityQueue[A] = (this, that) match {
+    case (BinomialQueue(Nil), q) => q
+    case (q, BinomialQueue(Nil)) => q
+    case (BinomialQueue(thisList), BinomialQueue(thatList)) => BinomialQueue(meldLists(thisList, thatList))
+  }
+
+  // Methods related to scala collections
+  override def isEmpty: Boolean = nodes.isEmpty
+  override def iterator: Iterator[A] = nodes.flatMap(_.toList).iterator
 
   private def meldLists[T](q1: List[Node[T]], q2: List[Node[T]]) : List[Node[T]] = (q1, q2) match {
     case (Nil, q) => q
     case (q, Nil) => q
     case (x :: xs, y :: ys) => if (x.rank < y.rank) x :: meldLists(xs, y :: ys)
-                               else if (x.rank > y.rank) y :: meldLists(x :: xs, ys)
-                               else insertNode(x.link(y), meldLists(xs, ys))
+    else if (x.rank > y.rank) y :: meldLists(x :: xs, ys)
+    else insertNode(x.link(y), meldLists(xs, ys))
   }
 
   private def insertNode[T](n: Node[T], lst: List[Node[T]]) : List[Node[T]] = lst match {
@@ -65,12 +106,15 @@ object PriorityQueue extends OrderedTraversableFactory[PriorityQueue] {
     case x :: xs => if (n.rank < x.rank) n :: x :: xs
     else insertNode(x.link(n), xs)
   }
+}
 
-  override def newBuilder[A](implicit ord: Ordering[A]): mutable.Builder[A, PriorityQueue[A]] = new ArrayBuffer[A] mapResult {xs =>
-    var r = new PriorityQueue[A](Nil)
-    for (x <- xs) r = r + x
-    r
-  }
+object PriorityQueue extends OrderedTraversableFactory[PriorityQueue] {
+
+  // Methods related to scala collections
+  override def newBuilder[A](implicit ord: Ordering[A]): mutable.Builder[A, PriorityQueue[A]] =
+    new ArrayBuffer[A] mapResult { xs =>
+      xs.foldLeft(BinomialQueue[A](Nil))((t, x) => t + x)
+    }
 
   implicit def canBuildFrom[A](implicit ord: Ordering[A]): CanBuildFrom[Coll, A, PriorityQueue[A]] = new GenericCanBuildFrom[A]
 }
