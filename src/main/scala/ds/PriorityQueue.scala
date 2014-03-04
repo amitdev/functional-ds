@@ -76,7 +76,7 @@ object PriorityQueue extends OrderedTraversableFactory[PriorityQueue] {
  * @param ord Ordering of data.
  * @tparam A Type of data.
  */
-private case class Node[A](data: A, rank: Int = 0, children: List[Node[A]] = Nil)
+private[ds] case class Node[A](data: A, rank: Int = 0, children: List[Node[A]] = Nil)
                           (implicit val ord: Ordering[A]) extends Ordered[Node[A]] {
 
   /**
@@ -99,7 +99,7 @@ private case class Node[A](data: A, rank: Int = 0, children: List[Node[A]] = Nil
  * @param ord Ordering of data
  * @tparam A Type of data
  */
-private final case class BinomialQueue[A] (private val nodes: List[Node[A]])(implicit override val ord: Ordering[A])
+private[ds] final case class BinomialQueue[A] (nodes: List[Node[A]])(implicit override val ord: Ordering[A])
   extends PriorityQueue[A] {
 
   def +(x: A) : BinomialQueue[A] = BinomialQueue(insertNode(Node(x), nodes))
